@@ -26,4 +26,6 @@ def font(size=14, bold=False):
 
 
 def money(amount):
-    return "\u20a6" + f"{amount:,.0f}"
+    # Whole-naira samples stay compact; typed fractional prices keep their kobo.
+    amount = round(amount, 2)
+    return "\u20a6" + (f"{amount:,.0f}" if amount == int(amount) else f"{amount:,.2f}")

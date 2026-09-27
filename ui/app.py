@@ -8,6 +8,9 @@ from ui.components.widgets import icon, label
 
 
 class ShopManager(ctk.CTk):
+    # Keep Windows' light title bar instead of CTk's withdraw/redraw workaround.
+    _deactivate_windows_window_header_manipulation = True
+
     def __init__(self):
         ctk.set_appearance_mode("light")
         ctk.set_default_color_theme("blue")
@@ -17,6 +20,8 @@ class ShopManager(ctk.CTk):
         self.configure(fg_color=T.BG)
         self.store = MockStore()
         self.page = None
+        self.pages = {}
+        self.drawer = None
         self.toast_widget = None
         self.toast_job = None
         self.grid_rowconfigure(0, weight=1)
@@ -78,29 +83,72 @@ class ShopManager(ctk.CTk):
         from ui.pages.pos import SalePage
         from ui.pages.history import HistoryPage
         from ui.pages.details import ProductDetails, SaleDetails, AuditDetails
+        from ui.pages.products import ProductsPage
         if route == "settings":
-            self.toast("Settings is reserved for the next screen batch.", "info")
+            self.toast("Settings is reserved.", "info")
             return
-        routes = {"home": HomePage, "pos": SalePage, "products": SalePage,
+        routes = {"home": HomePage, "pos": SalePage, "products": ProductsPage,
                   "sales": HistoryPage, "audit": HistoryPage,
                   "product": ProductDetails, "sale": SaleDetails, "log": AuditDetails}
-        if self.page is not None:
-            # CTkScrollableFrame owns an outer frame; destroying it also removes its canvas.
-            self.page.destroy()
+        self.close_drawer()
+        # Pages are built lazily, then reused. In particular POS keeps its search,
+        # scroll positions, images, and cart widgets when navigating away and back.
+        key = (route, tuple(sorted(params.items())))
+        cached = self.pages.get(key)
+        stale = cached and cached[1] != self.store.revision and route not in ("pos", "products")
+        old_page = self.page
+        obsolete = None
+        if cached is None or stale:
+            arguments = dict(params)
+            if route == "audit":
+                arguments["audit"] = True
+            new_page = routes[route](self, **arguments)
+            if cached:
+                obsolete = cached[0]
+            self.pages[key] = (new_page, self.store.revision)
+        else:
+            new_page = cached[0]
+            if hasattr(new_page, "refresh"):
+                new_page.refresh()
         self.route = route
         self.route_params = params
         active = {"product": "products", "sale": "sales", "log": "audit"}.get(route, route)
-        for key, widget in self.nav_buttons.items():
-            widget.configure(fg_color=T.NAV_ACTIVE if key == active else "transparent",
-                             text_color=T.WHITE if key == active else T.NAV_TEXT)
-        if route == "products":
-            params["catalog"] = True
-        elif route == "audit":
-            params["audit"] = True
-        self.page = routes[route](self, **params)
+        for nav_key, widget in self.nav_buttons.items():
+            widget.configure(fg_color=T.NAV_ACTIVE if nav_key == active else "transparent",
+                             text_color=T.WHITE if nav_key == active else T.NAV_TEXT)
+        self.page = new_page
         self.page.grid(row=0, column=0, sticky="nsew")
-        self.update_idletasks()
-        self.page._parent_canvas.yview_moveto(0)
+        if old_page is not None and old_page is not new_page:
+            old_page.grid_remove()
+        if obsolete is not None:
+            obsolete.destroy()
+        # Keep only the most recent document of each kind. Main workspaces stay
+        # cached, but opening hundreds of receipts must not retain every widget.
+        if route in ("product", "sale", "log"):
+            # Compare against the route cache key, never a sidebar button key:
+            # deleting the current document here leaves the content area blank.
+            for previous_key in list(self.pages):
+                if previous_key[0] == route and previous_key != key:
+                    previous_page, _ = self.pages.pop(previous_key)
+                    previous_page.destroy()
+
+    def data_changed(self):
+        """Refresh only live collection views; reports check revision on return."""
+        for (route, _), (page, _) in self.pages.items():
+            if route in ("pos", "products"):
+                page.refresh()
+
+    def open_log(self, log_id):
+        from ui.components.audit_drawer import AuditDrawer
+        self.close_drawer()
+        self.drawer = AuditDrawer(self, log_id)
+        self.drawer.place(relx=1, rely=0, relheight=1, anchor="ne")
+        self.drawer.lift()
+
+    def close_drawer(self):
+        if self.drawer is not None:
+            self.drawer.destroy()
+            self.drawer = None
 
     def toast(self, message, tone="info"):
         if self.toast_job:

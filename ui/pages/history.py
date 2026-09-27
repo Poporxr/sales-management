@@ -1,3 +1,9 @@
+"""Filter the in-memory records first, then paginate the resulting collection.
+
+CSV export uses that filtered collection, not just the currently visible page.
+The app caches this screen until a session edit makes its data revision stale.
+"""
+
 import csv
 import math
 from datetime import datetime, timedelta
@@ -9,7 +15,8 @@ from ui.components.widgets import Page, Metric, Table, label, panel, button, ent
 
 def action_tone(action):
     return {"Sale Completed": "green", "Product Updated": "blue", "Product Added": "amber",
-            "Product Deleted": "red", "Settings Changed": "purple", "User Login": "purple"}.get(action, "blue")
+            "Product Deleted": "red", "Settings Changed": "purple", "User Login": "purple",
+            "Stock Adjusted": "amber", "Price Changed": "purple"}.get(action, "blue")
 
 
 class HistoryPage(Page):
@@ -45,6 +52,8 @@ class HistoryPage(Page):
         self.refilter()
 
     def refilter(self, *_):
+        # Filters compose together. Reset pagination so a narrower result cannot
+        # leave the user looking at an out-of-range, apparently empty page.
         query = self.query.get().strip().lower()
         first, second, date_range = self.filter_one.get(), self.filter_two.get(), self.dates.get()
         now = datetime.now()
@@ -83,7 +92,7 @@ class HistoryPage(Page):
             counts = lambda prefix: sum(r["action"].startswith(prefix) for r in self.filtered)
             values = [("Total Logs", len(self.filtered), "receipt", "blue"),
                       ("Sales", counts("Sale"), "cart", "green"),
-                      ("Product Changes", counts("Product"), "box", "purple"),
+                      ("Product Changes", counts("Product") + counts("Stock") + counts("Price"), "box", "purple"),
                       ("System Actions", counts("Settings"), "settings", "amber"),
                       ("Security Events", counts("User"), "shield", "red")]
         else:
@@ -115,7 +124,7 @@ class HistoryPage(Page):
         date_label.bind("<Button-1>", lambda event: self.toggle_sort())
         start = (self.page_number - 1) * 10
         for record in self.filtered[start:start + 10]:
-            go = lambda r=record: self.app.navigate("log", log_id=r["id"]) if self.audit else self.app.navigate("sale", sale_id=r["id"])
+            go = lambda r=record: self.app.open_log(r["id"]) if self.audit else self.app.navigate("sale", sale_id=r["id"])
             if self.audit:
                 values = [record["id"], record["date"].strftime("%d %b %Y, %I:%M %p"), record["user"],
                           lambda p, r=record: badge(p, r["action"], action_tone(r["action"])),

@@ -30,12 +30,12 @@ def check(name):
     ImageGrab.grab(window=app.winfo_id()).save(output / f"{name}.png")
     app.attributes("-topmost", False)
     print(f"{name}: root={app.winfo_width()} grid={page.products_frame.winfo_width()} scale={page._get_widget_scaling()} columns={page.columns}", flush=True)
-    tiles = page.products_frame.winfo_children()
+    tiles = page.tiles.values()
     for tile in tiles:
         for widget in tile.winfo_children():
             assert widget.winfo_x() >= 0
             assert widget.winfo_x() + widget.winfo_width() <= tile.winfo_width(), (name, widget, tile.winfo_width())
-    assert page._parent_canvas.yview()[0] == 0, page._parent_canvas.yview()
+    assert page.products_frame._parent_canvas.yview()[0] == 0, page.products_frame._parent_canvas.yview()
     print(f"{name}: {page.columns} columns; product content fits; page opens at top", flush=True)
 
 

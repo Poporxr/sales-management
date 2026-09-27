@@ -1,3 +1,5 @@
+"""Dashboard summaries are derived from the same offline records as history."""
+
 from datetime import datetime
 import customtkinter as ctk
 from ui import theme as T
@@ -10,6 +12,8 @@ class HomePage(Page):
         header = self.heading("Welcome Back", "Here's what's happening at your store today.")
         label(header, datetime.now().strftime("%a, %d %b %Y  |  %I:%M %p"), 13,
               color=T.MUTED, image=icon("calendar"), compound="left").pack(side="right")
+        # Historical fixtures use a fixed date; show the latest trading day
+        # instead of labeling those records as live sales from today.
         latest_date = self.store.sales[0]["date"].date()
         today = [s for s in self.store.sales if s["date"].date() == latest_date]
         low = sorted([p for p in self.store.products if p["stock"] <= p["minimum"]], key=lambda p: p["stock"])

@@ -1,9 +1,16 @@
+"""Product, sale, and audit documents backed by the session store.
+
+Sale lines always render their saved snapshots. Editing today's product never
+rewrites the historical price shown on a receipt.
+"""
+
 from datetime import datetime
 import customtkinter as ctk
 from ui import theme as T
 from ui.components.widgets import (Page, Table, Chart, label, panel, button, badge,
-                                   product_image, key_values, icon_button, entry, select)
-from ui.components.dialogs import number_form, edit_text, confirm
+                                   product_image, key_values, icon_button)
+from ui.components.dialogs import number_form, edit_text
+from ui.components.product_dialogs import ProductDialog, StockDialog, delete_product
 
 
 def section(parent, title):
@@ -93,7 +100,9 @@ class ProductDetails(Page):
         for widget in self.tab_body.winfo_children():
             widget.destroy()
         if tab == "Edit Product":
-            self.edit_form()
+            self.tabs.set("Overview")
+            self.show_tab("Overview")
+            ProductDialog(self.app, self.product["id"])
             return
         if tab in ("Stock History", "Price History"):
             field = "stock" if tab == "Stock History" else "price"
@@ -172,70 +181,19 @@ class ProductDetails(Page):
         self.show_tab("Edit Product")
 
     def change(self, field, title, caption, integer=False):
+        if field == "stock":
+            return StockDialog(self.app, self.product["id"])
         def save(value):
-            if field == "stock" and value < self.store.cart.get(self.product["id"], 0):
-                self.app.toast("Remove reserved items from the cart before reducing stock.", "warning")
-                return
-            self.product.setdefault(field + "_history", []).append(dict(date=datetime.now(), old=self.product[field], new=value))
-            self.product[field] = value
+            values = dict(self.product)
+            values[field] = value
+            self.store.save_product(values, self.product["id"])
+            self.app.data_changed()
             self.app.navigate("product", product_id=self.product["id"])
             self.app.toast("Product updated for this session.", "success")
         number_form(self.app, title, caption, self.product[field], save, integer)
 
     def delete(self):
-        def remove():
-            pid = self.product["id"]
-            self.store.cart.pop(pid, None)
-            if self.store.held_cart:
-                self.store.held_cart[0].pop(pid, None)
-            self.store.products.remove(self.product)
-            self.store.discount = 0
-            self.app.navigate("products")
-            self.app.toast("Product removed from this session.", "success")
-        confirm(self.app, "Delete Product", f"Delete {self.product['name']}? Existing sale receipts will be retained.", remove)
-
-    def edit_form(self):
-        body = section(self.tab_body, "Edit Product")
-        fields = {}
-        form = ctk.CTkFrame(body, fg_color="transparent")
-        form.pack(fill="x")
-        for i, (field, caption) in enumerate([("name", "Product name"), ("barcode", "Barcode / SKU"),
-                                              ("brand", "Brand"), ("unit", "Unit"), ("minimum", "Minimum stock")]):
-            form.grid_columnconfigure(i % 2, weight=1)
-            group = ctk.CTkFrame(form, fg_color="transparent")
-            group.grid(row=i // 2, column=i % 2, sticky="ew", padx=(0, 20), pady=8)
-            label(group, caption, 12, color=T.MUTED).pack(anchor="w")
-            field_entry = entry(group, caption)
-            field_entry.pack(fill="x", pady=5)
-            field_entry.insert(0, str(self.product[field]))
-            fields[field] = field_entry
-        label(body, "Category", 12, color=T.MUTED).pack(anchor="w", pady=(10, 5))
-        category = select(body, ["Beverages", "Snacks", "Groceries", "Household", "Personal Care", "Others"])
-        category.set(self.product["category"])
-        category.pack(anchor="w")
-        error = label(body, "", 12, color=T.RED)
-        error.pack(anchor="w", pady=8)
-
-        def save():
-            values = {key: widget.get().strip() for key, widget in fields.items()}
-            if any(not value for value in values.values()):
-                error.configure(text="Complete all fields.")
-                return
-            try:
-                values["minimum"] = int(values["minimum"])
-                if values["minimum"] < 0:
-                    raise ValueError
-            except ValueError:
-                error.configure(text="Minimum stock must be a non-negative whole number.")
-                return
-            if any(p["id"] != self.product["id"] and p["barcode"] == values["barcode"] for p in self.store.products):
-                error.configure(text="Another product already has this barcode.")
-                return
-            self.product.update(values, category=category.get())
-            self.app.navigate("product", product_id=self.product["id"])
-            self.app.toast("Product updated for this session.", "success")
-        button(body, "Save Changes", save, "save", kind="primary").pack(anchor="e")
-
+        delete_product(self.app, self.product["id"])
 
 class SaleDetails(Page):
     def __init__(self, app, sale_id):
@@ -300,6 +258,7 @@ class SaleDetails(Page):
     def edit_notes(self):
         def save(value):
             self.sale["notes"] = value
+            self.store.revision += 1
             self.app.navigate("sale", sale_id=self.sale["id"])
         edit_text(self.app, "Sale Notes", self.sale["notes"], save)
 
@@ -365,5 +324,6 @@ class AuditDetails(Page):
     def edit_notes(self):
         def save(value):
             self.log["notes"] = value
+            self.store.revision += 1
             self.app.navigate("log", log_id=self.log["id"])
         edit_text(self.app, "Audit Notes", self.log["notes"], save)

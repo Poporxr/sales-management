@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from PIL import ImageGrab
 import customtkinter as ctk
 from ui.app import ShopManager
+from ui.components.dialogs import SaleCompletedDialog
 
 OUTPUT = Path(__file__).resolve().parents[1] / "artifacts"
 OUTPUT.mkdir(exist_ok=True)
@@ -43,9 +44,20 @@ def run():
                               ("product", {"product_id": 1}), ("products", {})]:
             app.navigate(route, **params)
             capture(route)
+            assert app.page.winfo_exists() and app.page.winfo_ismapped(), route
             print(f"Rendered {route}", flush=True)
+        # Alternate document IDs and revisit them: cache eviction must never
+        # destroy the newly opened product, receipt, or audit detail page.
+        for route, field, ids in [("product", "product_id", [1, 2, 1]),
+                                  ("sale", "sale_id", ["000048", "000047", "000048"]),
+                                  ("log", "log_id", ["000124", "000123", "000124"])]:
+            for identifier in ids:
+                app.navigate(route, **{field: identifier})
+                app.update()
+                assert app.page.winfo_exists() and app.page.winfo_ismapped(), (route, identifier)
+                assert app.page.body.winfo_width() > 100
         app.navigate("product", product_id=1)
-        for tab in ["Stock History", "Price History", "Sales History", "Edit Product", "Overview"]:
+        for tab in ["Stock History", "Price History", "Sales History", "Overview"]:
             app.page.show_tab(tab)
             app.update()
         app.page._parent_canvas.event_generate("<MouseWheel>", delta=-120)
@@ -77,7 +89,9 @@ def run():
         dialog.amount.delete(0, "end")
         dialog.amount.insert(0, "6000")
         dialog.complete()
-        assert app.route == "sale" and len(app.store.sales) == 49
+        assert app.route == "pos" and len(app.store.sales) == 49
+        success = next(w for w in app.winfo_children() if isinstance(w, SaleCompletedDialog))
+        success.close()
         assert app.store.sales[0]["total"] == 5400
         app.geometry("1180x720+0+0")
         for route, params in [("home", {}), ("pos", {}), ("sales", {}), ("audit", {}),

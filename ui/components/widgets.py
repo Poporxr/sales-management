@@ -9,6 +9,8 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 from ui import theme as T
 
 ASSETS = Path(__file__).resolve().parents[2] / "assets"
+# Uploaded images are decoded once and kept in memory for this offline session.
+LOCAL_IMAGES = {}
 GLYPHS = {"home": "\ue80f", "cart": "\ue7bf", "box": "\ue7b8", "receipt": "\ue8a5",
           "shield": "\ue730", "settings": "\ue713", "store": "\ue719", "back": "\ue72b",
           "next": "\ue72a", "search": "\ue721", "plus": "\ue710", "minus": "\ue738",
@@ -16,7 +18,8 @@ GLYPHS = {"home": "\ue80f", "cart": "\ue7bf", "box": "\ue7b8", "receipt": "\ue8a
           "save": "\ue74e", "export": "\ue898", "eye": "\ue890", "clock": "\ue823",
           "calendar": "\ue787", "user": "\ue77b", "check": "\ue73e", "copy": "\ue8c8",
           "chart": "\ue9d9", "money": "\ue8c7", "tag": "\ue8ec", "info": "\ue946",
-          "scan": "\ue722", "link": "\ue71b", "database": "\ue753"}
+          "scan": "\ue722", "link": "\ue71b", "database": "\ue753",
+          "image": "\ue91b", "lock": "\ue72e", "mail": "\ue715"}
 
 
 @lru_cache(maxsize=160)
@@ -35,6 +38,9 @@ def icon(name, color=T.MUTED, size=20):
 
 @lru_cache(maxsize=64)
 def product_image(key, size=76):
+    """Decode bundled files once per size; there is no URL/network fallback."""
+    if key in LOCAL_IMAGES:
+        return ctk.CTkImage(LOCAL_IMAGES[key], size=(size, size))
     path = ASSETS / "products" / f"{key}.jpg"
     if path.exists():
         with Image.open(path) as source:
@@ -63,15 +69,20 @@ def button(parent, text, command, symbol=None, kind="soft", width=120, **kwargs)
               "green": (T.GREEN_LIGHT, T.GREEN, "#CAF0D9")}
     bg, fg, hover = colors[kind]
     widget = ctk.CTkButton(parent, text=text, command=command, font=T.font(13),
-                           fg_color=bg, text_color=fg, hover_color=hover, corner_radius=7,
-                           height=38, width=width, image=icon(symbol, fg) if symbol else None,
+                           fg_color=bg, text_color=fg, hover_color=hover,
+                           corner_radius=kwargs.pop("corner_radius", 7),
+                           height=kwargs.pop("height", 34), width=width,
+                           image=icon(symbol, fg, kwargs.pop("icon_size", 17)) if symbol else None,
                            compound="left", **kwargs)
     return widget
 
 
-def icon_button(parent, symbol, command, hint, kind="soft", size=34):
-    widget = button(parent, "", command, symbol, kind=kind, width=size)
-    widget.configure(height=size)
+def icon_button(parent, symbol, command, hint, kind="soft", size=24):
+    # CTk's default border spacing can enlarge an icon-only button beyond its
+    # requested size. Explicit spacing keeps the small X/quantity controls fixed.
+    widget = button(parent, "", command, symbol, kind=kind, width=size,
+                    height=size, icon_size=12 if symbol == "close" else 14,
+                    border_spacing=0, corner_radius=4)
     Tooltip(widget, hint)
     return widget
 
@@ -111,6 +122,7 @@ def select(parent, values, command=None, width=170):
 
 
 class Page(ctk.CTkScrollableFrame):
+    """Long report/detail pages scroll as one document; POS uses FixedPage."""
     def __init__(self, app):
         super().__init__(app.content, fg_color=T.BG, corner_radius=0,
                          scrollbar_button_color="#CFD9E7")
@@ -132,6 +144,27 @@ class Page(ctk.CTkScrollableFrame):
         if subtitle:
             label(text, subtitle, 15, color=T.MUTED).pack(anchor="w", pady=(2, 0))
         return frame
+
+
+class FixedPage(ctk.CTkFrame):
+    """A viewport-sized page whose child panels own their scrolling."""
+    heading = Page.heading
+
+    def __init__(self, app):
+        super().__init__(app.content, fg_color=T.BG, corner_radius=0)
+        self.app, self.store = app, app.store
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+        self.body = ctk.CTkFrame(self, fg_color="transparent")
+        self.body.grid(row=0, column=0, sticky="nsew", padx=20, pady=18)
+
+
+class ScrollArea(ctk.CTkScrollableFrame):
+    """An independent scroll pane; its viewport width never follows child sizes."""
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, fg_color=kwargs.pop("fg_color", T.WHITE),
+                         corner_radius=0, scrollbar_button_color="#CCD8E7", **kwargs)
+        self.grid_columnconfigure(0, weight=1)
 
 
 class Metric(ctk.CTkFrame):
