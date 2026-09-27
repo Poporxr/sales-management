@@ -1,0 +1,98 @@
+[
+  {
+    "asset": "products/coke.jpg",
+    "source": "https://cdn.shopify.com/s/files/1/0773/4037/7385/files/spar4261_9f93fc20-990b-4468-8392-dfef69631318.jpg?v=1780921855",
+    "title": "Coca Cola Coke Pet Bottle 50 cl",
+    "product_url": "https://www.supermart.ng/products/coca-cola-coke-pet-bottle-50-cl",
+    "credit": "Supermart.ng / respective product brands",
+    "usage": "Local educational prototype reference; no redistribution license claimed."
+  },
+  {
+    "asset": "products/pepsi.jpg",
+    "source": "https://cdn.shopify.com/s/files/1/0773/4037/7385/files/1499346318079_spar2138_coca_cola_coke_pet_bottle_35_cl.jpg?v=1689111577",
+    "title": "Coca Cola Coke Pet Bottle 35 cl",
+    "product_url": "https://www.supermart.ng/products/coca-cola-coke-pet-bottle-35-cl",
+    "credit": "Supermart.ng / respective product brands",
+    "usage": "Local educational prototype reference; no redistribution license claimed."
+  },
+  {
+    "asset": "products/fanta.jpg",
+    "source": "https://cdn.shopify.com/s/files/1/0773/4037/7385/files/spxspy2415.jpg?v=1689112149",
+    "title": "Fanta Orange Pet Bottle 50 cl",
+    "product_url": "https://www.supermart.ng/products/fanta-orange-pet-bottle-50-cl",
+    "credit": "Supermart.ng / respective product brands",
+    "usage": "Local educational prototype reference; no redistribution license claimed."
+  },
+  {
+    "asset": "products/sprite.jpg",
+    "source": "https://cdn.shopify.com/s/files/1/0773/4037/7385/files/spar2140x.jpg?v=1778141758",
+    "title": "Sprite Pet Bottle 35 cl",
+    "product_url": "https://www.supermart.ng/products/sprite-pet-bottle-35-cl",
+    "credit": "Supermart.ng / respective product brands",
+    "usage": "Local educational prototype reference; no redistribution license claimed."
+  },
+  {
+    "asset": "products/peak.jpg",
+    "source": "https://cdn.shopify.com/s/files/1/0773/4037/7385/files/1copy_facb8100-f503-4ce5-b1af-a9f476f90db1.jpg?v=1690629394",
+    "title": "Peak Instant Full Cream Milk Powder Tin 400 g",
+    "product_url": "https://www.supermart.ng/products/peak-instant-full-cream-milk-powder-tin-400-g",
+    "credit": "Supermart.ng / respective product brands",
+    "usage": "Local educational prototype reference; no redistribution license claimed."
+  },
+  {
+    "asset": "products/indomie.jpg",
+    "source": "https://cdn.shopify.com/s/files/1/0773/4037/7385/files/spcgps925.png?v=1689101646",
+    "title": "Indomie Instant Noodles Onion Chicken 70 g",
+    "product_url": "https://www.supermart.ng/products/indomie-instant-noodles-onion-chicken-70-g",
+    "credit": "Supermart.ng / respective product brands",
+    "usage": "Local educational prototype reference; no redistribution license claimed."
+  },
+  {
+    "asset": "products/golden.jpg",
+    "source": "https://cdn.shopify.com/s/files/1/0773/4037/7385/files/sprsi381.jpg?v=1688721619",
+    "title": "Nestle Golden Morn Puffs Multi-Grain 500 g",
+    "product_url": "https://www.supermart.ng/products/nestle-golden-morn-puffs-multi-grain-500-g",
+    "credit": "Supermart.ng / respective product brands",
+    "usage": "Local educational prototype reference; no redistribution license claimed."
+  },
+  {
+    "asset": "products/milo.jpg",
+    "source": "https://cdn.shopify.com/s/files/1/0773/4037/7385/files/spxabc458.jpg?v=1689901525",
+    "title": "Milo Food Drink Sachet 800 g",
+    "product_url": "https://www.supermart.ng/products/milo-food-drink-sachet-800-g",
+    "credit": "Supermart.ng / respective product brands",
+    "usage": "Local educational prototype reference; no redistribution license claimed."
+  },
+  {
+    "asset": "products/dettol.jpg",
+    "source": "https://cdn.shopify.com/s/files/1/0773/4037/7385/products/sprnw1396.png?v=1688289217",
+    "title": "Dettol Anti-Bacterial Soap Original 160 g",
+    "product_url": "https://www.supermart.ng/products/dettol-anti-bacterial-soap-original-160-g",
+    "credit": "Supermart.ng / respective product brands",
+    "usage": "Local educational prototype reference; no redistribution license claimed."
+  },
+  {
+    "asset": "products/closeup.jpg",
+    "source": "https://cdn.shopify.com/s/files/1/0773/4037/7385/files/1502725476020_sptotp50_close_up_toothpaste_deep_action_red_hot_55_g.jpg?v=1689082860",
+    "title": "Close Up Toothpaste Deep Action Red Hot 55 g",
+    "product_url": "https://www.supermart.ng/products/close-up-toothpaste-deep-action-red-hot-55-g",
+    "credit": "Supermart.ng / respective product brands",
+    "usage": "Local educational prototype reference; no redistribution license claimed."
+  },
+  {
+    "asset": "products/bread.jpg",
+    "source": "https://cdn.shopify.com/s/files/1/0773/4037/7385/files/bread105.jpg?v=1688720696",
+    "title": "Grand Milk Loaf - Big",
+    "product_url": "https://www.supermart.ng/products/grand-milk-loaf-big",
+    "credit": "Supermart.ng / respective product brands",
+    "usage": "Local educational prototype reference; no redistribution license claimed."
+  },
+  {
+    "asset": "products/maggi.jpg",
+    "source": "https://cdn.shopify.com/s/files/1/0773/4037/7385/files/spmex047.jpg?v=1689105306",
+    "title": "Maggi Chicken Cubes 8 g x50",
+    "product_url": "https://www.supermart.ng/products/maggi-chicken-cubes-8-g-x50",
+    "credit": "Supermart.ng / respective product brands",
+    "usage": "Local educational prototype reference; no redistribution license claimed."
+  }
+]

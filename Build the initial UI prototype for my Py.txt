@@ -1,0 +1,254 @@
+Build the initial UI prototype for my Python desktop project, **Shop Manager**, using the attached screen mockups as the visual reference.
+
+This is a Python training project, so keep the implementation clean, understandable, and reasonably simple. Do not over-engineer it.
+
+## Tech
+
+Use:
+- Python
+- CustomTkinter for the UI
+- Pillow where images are needed
+- Standard tkinter/ttk only where CustomTkinter does not provide a suitable component
+
+Do NOT use:
+- PySide/PyQt
+- PyWebView
+- HTML/CSS/JavaScript
+- Django
+- FastAPI
+- Any web frontend framework
+
+The application is currently intended to be a fully offline desktop application.
+
+## Current Goal
+
+For this first stage, build a **UI-only functional prototype**.
+
+I want to be able to run the application and navigate through the screens, open dialogs, interact with basic controls, and preview the complete application flow.
+
+Do NOT implement the real database or full business logic yet.
+
+Use realistic mock data where necessary.
+
+Navigation, buttons that open screens/dialogs, modal closing, sidebar states, basic search/filter UI behavior, quantity controls, etc. can work, but persistent data functionality can remain mocked.
+
+## Project Setup
+
+If the project is empty, create an appropriate Python project structure.
+
+Keep it roughly organized into:
+
+- `main.py` — application entry point
+- `ui/` — application UI
+- `ui/pages/` — main screens
+- `ui/components/` — reusable components
+- `ui/theme.py` — shared visual constants
+- `assets/` — images/icons
+- `data/` — reserved for the SQLite database later
+- `services/` — reserved for business logic later
+- `database/` — reserved for SQLite/database code later
+- `requirements.txt`
+
+Do not create unnecessary abstractions or dozens of tiny files.
+
+Set up a Python virtual environment if appropriate and install only the dependencies currently required, primarily `customtkinter` and `Pillow`.
+
+## Application Architecture
+
+Use ONE main `CTk` application window.
+
+Do not create a separate root window for each page.
+
+The sidebar should remain persistent while the content area changes between pages.
+
+Use frames/classes for individual pages and provide a simple centralized navigation mechanism.
+
+Dialogs/modals may use `CTkToplevel`.
+
+Structure the code so that real services and SQLite can be connected later without rewriting the UI.
+
+Do not put the entire application into `main.py`.
+
+## Main Navigation
+
+Implement the navigation represented in the attached designs:
+
+1. Home
+2. New Sale
+3. Products
+4. Sales History
+5. Audit Log
+6. Settings
+
+Maintain the active sidebar state.
+
+Also implement detail views where represented by the supplied mockups, such as:
+
+- Product Details
+- Sale Details
+- Audit Log Details
+
+These can exist within the main content area rather than becoming separate application windows.
+
+## UI
+
+Use the attached images as the primary visual source of truth.
+
+Reproduce them as closely as is practical with CustomTkinter while remaining realistic about Tkinter limitations.
+
+Prioritize:
+
+- layout
+- spacing
+- hierarchy
+- typography
+- sizing
+- sidebar
+- cards
+- tables/lists
+- buttons
+- inputs
+- status badges
+- consistent styling
+
+Do not waste excessive complexity trying to reproduce browser-only effects such as sophisticated shadows, blur, gradients, or animations.
+
+The application should resize reasonably, but this does not need to become a complex responsive-layout system.
+
+Create reusable styling/constants instead of hardcoding unrelated colors and fonts throughout every page.
+
+## Products
+
+Use mock products to populate the Products page.
+
+Product information can include:
+
+- product name
+- barcode/SKU
+- category
+- cost price
+- selling price
+- stock
+- minimum stock
+- unit
+- optional image
+- status
+
+The product code/barcode is important because the eventual application will allow products to be retrieved by entering or scanning their unique code.
+
+## New Sale
+
+Create the mocked POS workflow shown in the designs.
+
+The user should be able to:
+
+- search/enter a product name or barcode
+- add mocked products to the cart
+- change quantities
+- remove items
+- clear the cart
+- see totals
+- open the checkout dialog
+
+The data does not need to persist yet.
+
+## Dialogs
+
+Create reusable dialogs/components rather than duplicating implementations.
+
+The designs may include dialogs such as:
+
+- Add/Edit Product
+- Adjust Stock
+- Change Price
+- Manager Authorization
+- Checkout / Complete Sale
+- Sale Completed
+- confirmation dialog
+
+Only implement dialogs supported by the attached references at this stage.
+
+Manager authorization should eventually protect sensitive actions such as price changes, manual stock adjustments, product deletion, refunds/voids, and sensitive settings.
+
+For the prototype, a mock PIN may be used.
+
+## Toasts and Errors
+
+Create a reusable lightweight toast/notification component for states such as:
+
+- success
+- error
+- warning
+- information
+
+Use inline validation for form errors where appropriate.
+
+Do not use a modal for every minor error.
+
+## Important Future Architecture
+
+Do NOT implement this yet, but structure the code with these future requirements in mind.
+
+The production MVP will use local SQLite and remain fully functional without internet.
+
+Normal POS operations must never depend on a remote API.
+
+Eventually:
+
+- products will be stored locally
+- sales will be written locally
+- checkout will deduct stock locally
+- receipts will be generated locally
+- sensitive management changes will create audit records
+- manager credentials/PIN will be stored securely
+- old sales must retain the price at which an item was originally sold, even if the current product price changes later
+- audit records should be effectively append-only through the application
+
+The application may eventually support cloud synchronization and multi-store management, but DO NOT build that now.
+
+Do not add FastAPI, PostgreSQL, authentication servers, synchronization infrastructure, or a web dashboard.
+
+## Code Quality
+
+Keep the implementation appropriate for a Python training project while still following good software-engineering practices.
+
+Prefer readable code over clever abstractions.
+
+Use descriptive names.
+
+Avoid giant files where practical.
+
+Avoid premature abstractions.
+
+Do not introduce packages simply because they might be useful later.
+
+Add brief comments only where the intent is not obvious.
+
+## Workflow
+
+First inspect ALL attached mockups before writing the UI so the application uses one consistent design system.
+
+Then:
+
+1. Set up the project.
+2. Create the main application shell.
+3. Implement the persistent sidebar/navigation.
+4. Establish shared theme/style constants.
+5. Build each attached base screen.
+6. Add mock data.
+7. Connect navigation between screens.
+8. Implement the dialogs/interactions represented by the supplied designs.
+9. Run the application and fix import/runtime/layout errors.
+10. Verify that navigation and the mocked workflows work.
+
+Do not begin implementing SQLite or production business logic unless I explicitly ask for the next phase.
+
+At the end, tell me:
+- what you created
+- the resulting project structure
+- dependencies installed
+- how to run the application
+- which controls are currently functional
+- which functionality is intentionally mocked for the next phase
+
+Do not redesign the attached screens or add features that I did not request. If something in a mockup cannot reasonably be reproduced in CustomTkinter, implement the closest clean desktop equivalent instead of changing the overall design.
