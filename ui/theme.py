@@ -1,31 +1,34 @@
-"""Shared desktop palette and typography."""
+"""Shared colors, fonts, and money formatting.
 
-BG = "#F3F6FB"
-WHITE = "#FFFFFF"
-INK = "#10213B"
-MUTED = "#587095"
-LINE = "#E6EDF6"
-BLUE = "#1673FF"
-BLUE_LIGHT = "#EAF2FF"
-NAV = "#122536"
-NAV_ACTIVE = "#193F68"
+One place for the look of the app: if the owner wants a different
+accent color later, it changes here and everywhere follows.
+"""
+
+BG = "#F3F6FB"        # app background
+WHITE = "#FFFFFF"     # cards and panels
+INK = "#10213B"       # main text
+MUTED = "#587095"     # secondary text
+LINE = "#E6EDF6"      # borders
+ACCENT = "#1673FF"    # primary buttons and highlights
+ACCENT_DARK = "#0F5BCC"
+NAV = "#122536"       # sidebar
+NAV_ACTIVE = "#1E3A5C"
 NAV_TEXT = "#BCD0E4"
-GREEN = "#079447"
-GREEN_LIGHT = "#E0F7E9"
-RED = "#E74955"
-RED_LIGHT = "#FFF0F2"
+GREEN = "#0A7A3D"
+RED = "#D63A47"
 AMBER = "#B77A08"
-AMBER_LIGHT = "#FFF6E1"
-PURPLE = "#8150CC"
-PURPLE_LIGHT = "#F2ECFF"
+
 FONT = "Segoe UI"
 
 
 def font(size=14, bold=False):
+    """CustomTkinter wants fonts as a (name, size, weight) tuple."""
     return (FONT, size, "bold" if bold else "normal")
 
 
 def money(amount):
-    # Whole-naira samples stay compact; typed fractional prices keep their kobo.
-    amount = round(amount, 2)
-    return "\u20a6" + (f"{amount:,.0f}" if amount == int(amount) else f"{amount:,.2f}")
+    """Naira formatting: whole amounts stay compact, kobo shows when needed."""
+    amount = round(float(amount), 2)
+    if amount == int(amount):
+        return "\u20a6{:,.0f}".format(amount)
+    return "\u20a6{:,.2f}".format(amount)

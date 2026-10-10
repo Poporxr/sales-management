@@ -1,180 +1,153 @@
-"""Filter the in-memory records first, then paginate the resulting collection.
+"""Sales History: every completed sale in a table, newest first.
 
-CSV export uses that filtered collection, not just the currently visible page.
-The app caches this screen until a session edit makes its data revision stale.
+Date filter plus a search box narrow the rows. Double-click a row
+(or select it and press Open) for the detail dialog: the frozen item
+snapshots, the totals, and a Reprint receipt button that regenerates
+the PDF from the stored rows and opens it.
 """
 
-import csv
-import math
-from datetime import datetime, timedelta
-from tkinter import StringVar, filedialog
+import tkinter as tk
+from tkinter import messagebox
+
 import customtkinter as ctk
+
+import database
+import receipt
 from ui import theme as T
-from ui.components.widgets import Page, Metric, Table, label, panel, button, entry, select, badge, icon_button
+from ui.widgets import label, button, entry, dropdown
+from ui.table import make_table, clear_table, DATE_FILTERS
 
 
-def action_tone(action):
-    return {"Sale Completed": "green", "Product Updated": "blue", "Product Added": "amber",
-            "Product Deleted": "red", "Settings Changed": "purple", "User Login": "purple",
-            "Stock Adjusted": "amber", "Price Changed": "purple"}.get(action, "blue")
+class HistoryPage(ctk.CTkFrame):
+    def __init__(self, app):
+        super().__init__(app.content, fg_color="transparent")
+        self.app = app
+        # sale id -> full sale dict, so a clicked row can open its dialog
+        self.sale_ids = []
 
+        label(self, "Sales History", 24, True).pack(anchor="w", pady=(0, 12))
 
-class HistoryPage(Page):
-    def __init__(self, app, audit=False):
-        super().__init__(app)
-        self.audit = audit
-        self.page_number = 1
-        self.ascending = False
-        self.query = StringVar()
-        self.filtered = []
-        header = self.heading("Audit Logs" if audit else "Sales History",
-                              "Track all important activities and changes in your store." if audit else "View and manage all sales transactions.")
-        button(header, "Export Logs" if audit else "Export", self.export_csv, "export", width=140).pack(side="right")
-        filters = panel(self.body)
-        filters.pack(fill="x", pady=(0, 16))
-        self.dates = select(filters, ["All Dates", "20 Sep - 26 Sep 2025", "Today", "Last 7 Days"], self.refilter, width=205)
-        self.dates.pack(side="left", padx=8, pady=8)
-        self.search = entry(filters, "Search action, details or user..." if audit else "Search receipt, product or cashier...", self.query)
-        self.search.pack(side="left", fill="x", expand=True, padx=8)
-        self.filter_one = select(filters, ["All Actions"] + list(dict.fromkeys(x["action"] for x in self.store.logs)) if audit else ["All Payment Methods", "Cash", "Transfer"], self.refilter, width=175)
-        self.filter_one.pack(side="left", padx=8)
-        self.filter_two = select(filters, ["All Users", "Admin", "Staff 1"] if audit else ["All Statuses", "Completed"], self.refilter, width=135)
-        self.filter_two.pack(side="left", padx=8)
-        self.metrics = ctk.CTkFrame(self.body, fg_color="transparent")
-        self.metrics.pack(fill="x", pady=(0, 16))
-        self.table_panel = panel(self.body)
-        self.table_panel.pack(fill="both", expand=True)
-        self.table_body = ctk.CTkFrame(self.table_panel, fg_color="transparent")
-        self.table_body.pack(fill="both", expand=True, padx=14, pady=14)
-        self.footer = ctk.CTkFrame(self.table_panel, fg_color="transparent")
-        self.footer.pack(fill="x", padx=20, pady=(12, 22))
-        self.query.trace_add("write", lambda *_: self.refilter())
-        self.refilter()
+        filters = ctk.CTkFrame(self, fg_color="transparent")
+        filters.pack(fill="x", pady=(0, 10))
+        self.search_var = tk.StringVar()
+        search = entry(filters, "Search receipt number or cashier...", width=300)
+        search.pack(side="left", padx=(0, 8))
+        search.configure(textvariable=self.search_var)
+        self.search_var.trace_add("write", lambda *_: self.render())
+        self.period = dropdown(filters,
+                               [text for _, text in DATE_FILTERS],
+                               command=lambda _: self.render(), width=150)
+        self.period.pack(side="left", padx=(0, 8))
+        button(filters, "Open selected", self.open_selected,
+               kind="secondary", width=140).pack(side="left")
 
-    def refilter(self, *_):
-        # Filters compose together. Reset pagination so a narrower result cannot
-        # leave the user looking at an out-of-range, apparently empty page.
-        query = self.query.get().strip().lower()
-        first, second, date_range = self.filter_one.get(), self.filter_two.get(), self.dates.get()
-        now = datetime.now()
-        source = self.store.logs if self.audit else self.store.sales
-        self.filtered = []
-        for record in source:
-            if date_range == "Today" and record["date"].date() != now.date():
-                continue
-            if date_range == "Last 7 Days" and record["date"].date() < (now - timedelta(days=6)).date():
-                continue
-            if date_range == "20 Sep - 26 Sep 2025" and not datetime(2025, 9, 20) <= record["date"] < datetime(2025, 9, 27):
-                continue
-            if self.audit:
-                haystack = f"{record['id']} {record['action']} {record['details']} {record['user']}"
-                if first != "All Actions" and first != record["action"]:
-                    continue
-                if second != "All Users" and second != record["user"]:
-                    continue
-            else:
-                haystack = f"{record['id']} {record['cashier']} " + " ".join(p["name"] + " " + p["barcode"] for p in record["items"])
-                if first != "All Payment Methods" and first != record["payment"]:
-                    continue
-                if second != "All Statuses" and second != record["status"]:
-                    continue
-            if query in haystack.lower():
-                self.filtered.append(record)
-        self.filtered.sort(key=lambda r: r["date"], reverse=not self.ascending)
-        self.page_number = 1
-        self.render_metrics()
-        self.render_table()
+        table_frame = ctk.CTkFrame(self, fg_color=T.WHITE, corner_radius=10)
+        table_frame.pack(fill="both", expand=True)
+        self.table = make_table(table_frame, [
+            ("receipt", "Receipt", 90),
+            ("date", "Date", 150),
+            ("cashier", "Cashier", 110),
+            ("items", "Items", 60),
+            ("payment", "Payment", 90),
+            ("total", "Total", 110),
+        ])
+        self.table.bind("<Double-1>", lambda e: self.open_selected())
+        self.render()
 
-    def render_metrics(self):
-        for child in self.metrics.winfo_children():
-            child.destroy()
-        if self.audit:
-            counts = lambda prefix: sum(r["action"].startswith(prefix) for r in self.filtered)
-            values = [("Total Logs", len(self.filtered), "receipt", "blue"),
-                      ("Sales", counts("Sale"), "cart", "green"),
-                      ("Product Changes", counts("Product") + counts("Stock") + counts("Price"), "box", "purple"),
-                      ("System Actions", counts("Settings"), "settings", "amber"),
-                      ("Security Events", counts("User"), "shield", "red")]
-        else:
-            total = sum(s["total"] for s in self.filtered)
-            count = len(self.filtered)
-            units = sum(p["quantity"] for s in self.filtered for p in s["items"])
-            values = [("Total Sales", T.money(total), "chart", "green"),
-                      ("Total Transactions", count, "cart", "blue"),
-                      ("Total Items Sold", units, "box", "purple"),
-                      ("Average Sale", T.money(total / count if count else 0), "money", "amber")]
-        for i, (title, value, symbol, tone) in enumerate(values):
-            self.metrics.grid_columnconfigure(i, weight=1, uniform="metrics")
-            Metric(self.metrics, title, str(value), symbol, tone).grid(row=0, column=i, sticky="nsew", padx=(0 if i == 0 else 10, 0))
+    def current_period(self):
+        """Translate the dropdown's label back to the database filter key."""
+        chosen = self.period.get()
+        for key, text in DATE_FILTERS:
+            if text == chosen:
+                return key
+        return "all"
 
-    def render_table(self):
-        for child in self.table_body.winfo_children():
-            child.destroy()
-        for child in self.footer.winfo_children():
-            child.destroy()
-        if self.audit:
-            headings, weights = ["#", "Date & Time", "User", "Action", "Details", "Device"], [2, 4, 2, 4, 8, 2]
-        else:
-            headings, weights = ["#", "Date & Time", "Items", "Total", "Payment", "Status", "Cashier", "Action"], [2, 4, 2, 3, 3, 3, 2, 2]
-        table = Table(self.table_body, headings, weights)
-        table.pack(fill="x")
-        # The date heading is the sorting control; preserve the same column geometry.
-        date_label = table.winfo_children()[0].winfo_children()[1]
-        date_label.configure(text="Date & Time " + ("\u2191" if self.ascending else "\u2193"), cursor="hand2")
-        date_label.bind("<Button-1>", lambda event: self.toggle_sort())
-        start = (self.page_number - 1) * 10
-        for record in self.filtered[start:start + 10]:
-            go = lambda r=record: self.app.open_log(r["id"]) if self.audit else self.app.navigate("sale", sale_id=r["id"])
-            if self.audit:
-                values = [record["id"], record["date"].strftime("%d %b %Y, %I:%M %p"), record["user"],
-                          lambda p, r=record: badge(p, r["action"], action_tone(r["action"])),
-                          lambda p, r=record: label(p, r["details"], 11, color=T.MUTED, wraplength=310), "This Device"]
-            else:
-                values = [record["id"], record["date"].strftime("%d %b %Y, %I:%M %p"),
-                          f"{len(record['items'])} items", T.money(record["total"]),
-                          lambda p, r=record: badge(p, r["payment"], "green" if r["payment"] == "Cash" else "blue"),
-                          lambda p: badge(p, "Completed"), record["cashier"],
-                          lambda p, fn=go: icon_button(p, "eye", fn, "View sale", size=28)]
-            table.add(values, go)
-        if not self.filtered:
-            label(self.table_body, "No matching records", 18, color=T.MUTED).pack(pady=70)
-        pages = max(1, math.ceil(len(self.filtered) / 10))
-        prev = icon_button(self.footer, "back", lambda: self.move(-1), "Previous page", "neutral")
-        prev.pack(side="left", padx=(0, 5))
-        prev.configure(state="disabled" if self.page_number == 1 else "normal")
-        visible = range(max(1, min(self.page_number - 2, pages - 4)), min(pages, max(5, self.page_number + 2)) + 1)
-        for number in visible:
-            button(self.footer, str(number), lambda n=number: self.set_page(n),
-                   kind="primary" if number == self.page_number else "neutral", width=34).pack(side="left", padx=3)
-        nxt = icon_button(self.footer, "next", lambda: self.move(1), "Next page", "neutral")
-        nxt.pack(side="left", padx=5)
-        nxt.configure(state="disabled" if self.page_number == pages else "normal")
-        label(self.footer, f"Showing {start+1 if self.filtered else 0}-{min(start+10, len(self.filtered))} of {len(self.filtered)} {'logs' if self.audit else 'sales'}", 13, color=T.MUTED).pack(side="right")
+    def render(self):
+        clear_table(self.table)
+        self.sale_ids = []
+        query = self.search_var.get().strip().lower()
+        sales = database.list_sales_filtered(self.current_period())
+        if query:
+            sales = [s for s in sales
+                     if query in str(s["id"]) or query in s["cashier"].lower()
+                     or query in (s["customer_name"] or "").lower()]
+        for sale in sales:
+            full = database.get_sale(sale["id"])  # items for the count
+            self.table.insert("", "end", values=(
+                "#%06d" % sale["id"],
+                sale["date"],
+                sale["cashier"],
+                len(full["items"]),
+                sale["payment"],
+                T.money(sale["total"]),
+            ))
+            self.sale_ids.append(sale["id"])
 
-    def toggle_sort(self):
-        self.ascending = not self.ascending
-        self.refilter()
-
-    def move(self, delta):
-        self.set_page(max(1, min(math.ceil(len(self.filtered) / 10), self.page_number + delta)))
-
-    def set_page(self, number):
-        self.page_number = number
-        self.render_table()
-
-    def export_csv(self):
-        path = filedialog.asksaveasfilename(parent=self.app, title="Export Logs" if self.audit else "Export Sales",
-                                          defaultextension=".csv", filetypes=[("CSV", "*.csv")],
-                                          initialfile="audit-logs.csv" if self.audit else "sales.csv")
-        if not path:
+    def open_selected(self):
+        """Open the detail dialog for the highlighted row."""
+        selection = self.table.selection()
+        if not selection:
+            messagebox.showinfo("No sale selected",
+                                "Click a row first, then open it.")
             return
-        keys = ["id", "date", "user", "action", "details", "result"] if self.audit else ["id", "date", "total", "payment", "status", "cashier"]
+        index = self.table.index(selection[0])
+        SaleDialog(self, self.sale_ids[index])
+
+    def reprint(self, sale_id):
+        """Regenerate the PDF from the stored sale rows and open it."""
         try:
-            with open(path, "w", newline="", encoding="utf-8-sig") as output:
-                writer = csv.DictWriter(output, fieldnames=keys)
-                writer.writeheader()
-                for record in self.filtered:
-                    writer.writerow({key: record[key] for key in keys})
-            self.app.toast(f"Exported {len(self.filtered)} records.", "success")
-        except OSError as error:
-            self.app.toast(f"Could not export: {error.strerror}", "error")
+            path = receipt.generate_receipt(sale_id, self.app.config)
+        except Exception as e:
+            messagebox.showerror("Reprint failed",
+                                 "Could not build the receipt:\n%s" % e)
+            return
+        if not receipt.open_file(path):
+            messagebox.showwarning(
+                "No viewer found",
+                "The receipt was saved to:\n%s\n\nOpen it manually to print."
+                % path)
+
+
+class SaleDialog(ctk.CTkToplevel):
+    """One sale's detail: items, totals, payment, and reprint."""
+
+    def __init__(self, page, sale_id):
+        super().__init__(page)
+        self.page = page
+        sale = database.get_sale(sale_id)  # reload with items attached
+        self.title("Receipt #%06d" % sale["id"])
+        self.geometry("420x520")
+        self.transient(page)
+        self.grab_set()
+
+        body = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        body.pack(fill="both", expand=True, padx=20, pady=20)
+
+        label(body, "Receipt #%06d" % sale["id"], 18, True).pack(anchor="w")
+        label(body, "%s  |  Cashier: %s" % (sale["date"], sale["cashier"]),
+              12, color=T.MUTED).pack(anchor="w", pady=(0, 4))
+        if sale["customer_name"]:
+            label(body, "Customer: %s" % sale["customer_name"], 12,
+                  color=T.MUTED).pack(anchor="w", pady=(0, 8))
+
+        for item in sale["items"]:
+            row = ctk.CTkFrame(body, fg_color="transparent")
+            row.pack(fill="x", pady=3)
+            label(row, "%s  x%d" % (item["name"], item["quantity"]),
+                  13).pack(side="left")
+            label(row, T.money(item["price"] * item["quantity"]),
+                  13, True).pack(side="right")
+
+        label(body, "", 6).pack()  # spacer
+        label(body, "Total: " + T.money(sale["total"]), 16, True).pack(anchor="e")
+        label(body, "Paid (%s): %s" % (sale["payment"], T.money(sale["paid"])),
+              13, color=T.MUTED).pack(anchor="e")
+        if sale["payment"] == "Cash":
+            label(body, "Change: " + T.money(sale["change"]), 13,
+                  color=T.MUTED).pack(anchor="e")
+
+        footer = ctk.CTkFrame(self, fg_color="transparent")
+        footer.pack(fill="x", padx=20, pady=(0, 20))
+        button(footer, "Reprint receipt",
+               lambda: page.reprint(sale["id"])).pack(fill="x", pady=(0, 8))
+        button(footer, "Close", self.destroy, kind="secondary").pack(fill="x")

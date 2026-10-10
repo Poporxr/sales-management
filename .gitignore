@@ -1,4 +1,6 @@
-.venv/
+# Local runtime files: the database and the shop config are created
+# on first launch and should not be committed.
+data/
+store.json
 __pycache__/
 *.pyc
-artifacts/
